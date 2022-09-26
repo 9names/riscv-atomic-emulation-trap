@@ -178,12 +178,17 @@ extern "C" {
 #[export_name = "_start_trap_atomic_rust"]
 #[doc(hidden)]
 pub extern "C" fn _start_trap_atomic_rust(frame: *mut TrapFrame) {
+    use mcause::Trap;
+    use mcause::Exception;
     unsafe {
         let cause = mcause::read();
         let frame = &mut *frame;
         match cause.cause() {
-            mcause::Trap::Exception(e) => match e {
-                mcause::Exception::IllegalInstruction => {
+            Trap::Exception(e) => match e {
+                Exception::IllegalInstruction
+                | Exception::LoadFault
+                | Exception::StoreFault
+                | Exception::StorePageFault => {
                     if atomic_emulation(frame) {
                         // successfull emulation, move the mepc
                         frame.pc += core::mem::size_of::<usize>();
@@ -193,7 +198,7 @@ pub extern "C" fn _start_trap_atomic_rust(frame: *mut TrapFrame) {
                 }
                 _ => ExceptionHandler(&frame.as_riscv_rt_trap_frame()),
             },
-            mcause::Trap::Interrupt(_) => {
+            Trap::Interrupt(_) => {
                 let code = cause.code();
                 if code < __INTERRUPTS.len() {
                     let h = &__INTERRUPTS[code];
@@ -209,4 +214,3 @@ pub extern "C" fn _start_trap_atomic_rust(frame: *mut TrapFrame) {
         }
     }
 }
-
